@@ -1,0 +1,14 @@
+# Login to Azure
+az login
+
+# create resource group we use for Remote State
+az group create --location brasilsouth --name terrformstate
+
+# create storage account
+az storage account create --name tfstateaztreinamento --resource-group terraformstate --location brasilsouth --sku Standard_LRS
+
+# create Storage account container
+az storage container create -n terraformstate --account-name tfstateaztreinamento
+
+# recover azure blob storage key
+az storage account keys list --account-name tfstateaztreinamento --resource-group terraformstate

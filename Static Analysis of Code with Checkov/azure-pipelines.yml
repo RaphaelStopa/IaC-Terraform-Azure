@@ -1,0 +1,19 @@
+trigger:
+  paths:
+    include:
+      - infra/*
+
+pool:
+  vmImage: ubuntu-latest
+
+
+steps:
+- task: UsePythonVersion@0
+  inputs:
+    versionSpec: '3.x'
+    addToPath: true
+    architecture: 'x64'
+- script: pip install bridgecrew
+  displayName: 'Instalando BridgeCrew'
+- script: bridgecrew -d infra --bc-api-key 000000000000APIKey0000000000 --repo-id repo/repo --branch main
+  displayName: 'Scan com BridgeCrew'

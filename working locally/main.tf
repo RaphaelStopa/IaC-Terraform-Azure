@@ -1,33 +1,33 @@
-# doc do terraform com o Azure: https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs
+# terraform doc with Azure: https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs
 # Login: az login
-# Ver lista assinatura: az account list
-# Selecionar assinatura: az account set --subscription nomedasubscrition
-# ver dados da sua conta: az account show
+# View subscription list: az account list
+# select subscription: az account set --subscription nomedasubscrition
+# see your account details: az account show
 
-#trabalhando com variaveis. Precisa de um arquivo com o nome variables.tf
+# working with variables. Need a file named variables.tf
 
 terraform {
   required_providers{
-      # Usamos o azurerm, por estarmos usando o azure
-      # Em caso de outro procure em nos docs
-      azurerm = {
-          source = "hashicorp/azurerm"
-          version = ">=2.0"
-      }
+    # We use azurerm, because we are using azure
+    # In case of another look in the documentation
+    azurerm = {
+      source = "hashicorp/azurerm"
+      version = ">=2.0"
+    }
   }
 }
 
 provider "azurerm"{
-    features {
-      
-    }
+  features {
+
+  }
 }
 
-# terraform init "carrega o arquivo", inicializando o provider. Use sempre que achar necessário porque com ele você pode encontrar erros
+# terraform init "loads the file", initializing the provider. Use it whenever you think it's necessary because with it you can find mistakes
 
-# Tudo começa por um resource group
-#Criar recursos, o recurso grupo e o nome do recurso mesmo
-#rg, é como se fosse um apelido, definição, não é nome
+# It all starts with a resource group
+# Create resources, resource group and resource name same
+# rg, it's like a nickname, definition, it's not a name
 resource "azurerm_resource_group" "rg" {
   name = var.rg
   location = var.local
@@ -37,17 +37,17 @@ resource "azurerm_resource_group" "rg" {
   }
 }
 
-# terraform plan: este comando não executa em si. Ele apenas checa se já existe ou vai fazer um atualização. Ele gera um plana de execução, mostrando o que vai ser executado.
-# terraform apply: Roda em si. Ele vai pedir uma confirmação.
+# terraform plan:this command does not run itself. It just checks if it already exists or is going to do an update. It generates an execution plan, showing what will be executed.
+# terraform apply: Wheel itself. It will ask for confirmation.
 
-# Teste até esta parte ele criou um resource group
-# Caso queria fazer um update de alguma coisa basta fazer e rodar novamente, ele vai identificar e mudar. Experimente com as tags
+# So far he has created a resource group
+# If you want to update something, just do it and run it again, it will identify and change. Experiment with tags
 
 
-# Terraform Backend (para versionar terraform, mais pode usar o terraform cloud, blob e etc)
-# Crie um resource grupo so para ela e depois crie um store account.
-# Crie um container
-#interrasante sempre deixar ele abaixo do provider!
+# Terraform Backend (to version terraform, but you can use terraform cloud, blob and etc)
+# Create a resource group just for her and then create a store account.
+# create a container
+# interesting to always leave it under the provider!
 # terraform {
 #   backend "azurerm" {
 #     resource_group_name  = "StorageAccount-ResourceGroup"
@@ -60,13 +60,13 @@ resource "azurerm_resource_group" "rg" {
 # }
 
 
-# Criando uma rede interna
+# Creating an internal network
 resource "azurerm_virtual_network" "default" {
   name = var.vnet
   address_space = ["10.0.0.0/16"]
   location = var.local
   resource_group_name = var.rg
-  
+
 }
 
 # sub rede
@@ -75,7 +75,7 @@ resource "azurerm_subnet" "name" {
   resource_group_name = var.rg
   virtual_network_name = var.vnet
   address_prefixes = [ "10.0.1.0/24" ]
-  
+
 }
 
 resource "azurerm_network_interface" "default" {
@@ -85,7 +85,7 @@ resource "azurerm_network_interface" "default" {
 
   ip_configuration {
     name                          = "testconfiguration1"
-    subnet_id                     = azurerm_subnet.internal.id
+#    subnet_id                     = azurerm_subnet.internal.id
     private_ip_address_allocation = "Dynamic"
   }
 }
@@ -130,7 +130,6 @@ resource "azurerm_virtual_machine" "main" {
 }
 
 
-#Vou usar isto aqui para tentar combar atualização de cluster
 resource "azurerm_maintenance_configuration" "maintenance" {
   name                = "monday-mc"
   resource_group_name = azurerm_resource_group.rg.name
@@ -146,5 +145,3 @@ resource "azurerm_maintenance_configuration" "maintenance" {
     recur_every          = "7Days"
   }
 }
-
-

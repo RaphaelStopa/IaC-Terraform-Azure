@@ -1,0 +1,106 @@
+trigger:
+#- develop
+#- sit
+#- uat
+- sta
+#- master
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+#Group variables
+#- ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/develop') }}:
+#  - group  : border-dev
+#- ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/sit') }}:
+#  - group  : border-sit
+#- ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/uat') }}:
+#  - group  : border-uat
+- ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/sta') }}:
+  - group  : border-sta
+#- ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/master') }}:
+#  - group  : border-prd  
+#Shared Variables
+- group  : border-shd
+#Local variables
+- name   : anyTfChanges
+  value  : false
+- name   : var_pipeline_container
+  value  : network
+
+
+steps:
+
+- task: AzureCLI@2
+  displayName: az provider register
+  inputs:
+    azureSubscription: $(lib_service_conn)
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      az provider register --namespace 'Microsoft.Network'
+
+- task: TerraformInstaller@0
+  inputs:
+    terraformVersion: '0.13.0'
+
+- task: TerraformTaskV1@0
+  displayName: terraform init
+  inputs:
+    provider: 'azurerm'
+    command: 'init'
+    workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
+    backendServiceArm: '$(lib_service_conn)'
+    backendAzureRmResourceGroupName: '$(lib_pipeline_rg)'
+    backendAzureRmStorageAccountName: '$(lib_pipeline_stg_acc)'
+    backendAzureRmContainerName: '$(var_pipeline_container)'
+    backendAzureRmKey: '$(lib_tfstate_file)'
+
+- task: PowerShell@2
+  displayName: Test
+  inputs:
+    workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
+    targetType: 'inline'
+    script: |
+      # Write-Host "LASTEXITCODE : $LASTEXITCODE"
+      echo $(lib_client_shd_id)
+      echo $(lib_subscription_shd_id)
+
+- task: TerraformTaskV1@0
+  displayName: terraform plan -out=tfplan
+  inputs:
+    provider: 'azurerm'
+    command: 'plan'
+    workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
+    commandOptions: |
+      -out=tfplan -var-file=$(lib_tfvars_file) -var="stage=$(lib_stage)" -var="tenant_id=$(lib_tenant_id)" -var="subscription_shd_id=$(lib_subscription_shd_id)" -var="client_shd_id=$(lib_client_shd_id)" -var="secret_shd=$(lib_secret_shd)" 
+    environmentServiceNameAzureRM: '$(lib_service_conn)'
+
+- task: PowerShell@2
+  displayName: detect any terraform change
+  inputs:
+    workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
+    targetType: 'inline'
+    script: |
+      # Write-Host "LASTEXITCODE : $LASTEXITCODE"
+      $plan = $(terraform show -json tfplan | ConvertFrom-Json)
+      $actions = $plan.resource_changes.change.actions
+      Write-Host "Terraform actions : $actions"
+      if (($actions -contains 'create') -or ($actions -contains 'delete') -or ($actions -contains 'update'))
+      {
+        Write-Host "Terraform will perform the following actions : $actions"
+        Write-Host "##vso[task.setvariable variable=anyTfChanges;]true"
+      }
+      else
+      {
+        Write-Host "There is no change detected in Terraform tfplan file"
+      }
+- task: TerraformTaskV1@0
+  displayName: terraform apply tfplan
+  condition: eq(variables.anyTfChanges, true)
+  inputs:
+    provider: 'azurerm'
+    command: 'apply'
+    workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
+    commandOptions: 'tfplan'
+    environmentServiceNameAzureRM: '$(lib_service_conn)'
